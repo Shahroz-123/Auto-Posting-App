@@ -1,0 +1,128 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// =============================
+// ENUMS
+// =============================
+
+enum SocialPlatform {
+  INSTAGRAM
+  FACEBOOK
+  LINKEDIN
+  TIKTOK
+}
+
+enum PostStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHING
+  PUBLISHED
+  FAILED
+}
+
+enum TaskPriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+// =============================
+// COMPANY
+// =============================
+
+model Company {
+  id        Int      @id @default(autoincrement())
+  name      String
+  industry   String
+  initials  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  socialAccounts SocialAccount[]
+  posts         Post[]
+  tasks         Task[]
+  media         Media[]
+}
+
+// =============================
+// SOCIAL ACCOUNT
+// =============================
+
+model SocialAccount {
+  id          Int            @id @default(autoincrement())
+  companyId   Int
+  platform    SocialPlatform
+  accountName String
+  connected   Boolean         @default(false)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+}
+
+// =============================
+// POST
+// =============================
+
+model Post {
+  id          Int        @id @default(autoincrement())
+  companyId   Int
+  caption     String     @db.Text
+  platforms   SocialPlatform[]
+  status      PostStatus @default(DRAFT)
+  scheduledAt DateTime?
+  mediaUrl   String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([status, scheduledAt])
+}
+
+// =============================
+// TASK
+// =============================
+
+model Task {
+  id          Int          @id @default(autoincrement())
+  companyId   Int
+  title       String
+  priority    TaskPriority @default(MEDIUM)
+  dueDate    DateTime
+  completed  Boolean      @default(false)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([completed, dueDate])
+}
+
+// =============================
+// MEDIA
+// =============================
+
+model Media {
+  id        Int      @id @default(autoincrement())
+  companyId Int
+  fileName  String
+  fileUrl   String
+  fileType  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+}
