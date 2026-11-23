@@ -12,13 +12,15 @@ import {
   Globe,
   BriefcaseBusiness,
   Video,
+  MessageCircle,
   X,
   Clock3,
   MonitorPlay,
 } from "lucide-react";
+import BackButton from "@/components/BackButton";
+import ConnectSocialModal, { SocialAccountItem } from "@/components/ConnectSocialModal";
 
 import {
-  companies,
   socialPlatforms,
   SocialPlatform,
 } from "@/lib/data";
@@ -32,6 +34,36 @@ type PlatformCaptions = Partial<
 export default function CreatePostForm() {
 
   const [companyId, setCompanyId] = useState("1");
+  const [companiesList, setCompaniesList] = useState<{ id: number; name: string; industry: string; initials?: string | null }[]>([]);
+  const [socialAccounts, setSocialAccounts] = useState<SocialAccountItem[]>([]);
+  const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
+
+  const loadSocialAccounts = (cId: string) => {
+    fetch(`/api/social-accounts?companyId=${cId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) setSocialAccounts(data);
+      })
+      .catch((err) => console.error("Failed to load company social accounts:", err));
+  };
+
+  useEffect(() => {
+    if (companyId) {
+      loadSocialAccounts(companyId);
+    }
+  }, [companyId]);
+
+  useEffect(() => {
+    fetch("/api/companies")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setCompaniesList(data);
+          setCompanyId(data[0].id.toString());
+        }
+      })
+      .catch((err) => console.error("Failed to load companies in form:", err));
+  }, []);
 
   const [selectedPlatforms, setSelectedPlatforms] =
     useState<SocialPlatform[]>(["instagram", "facebook"]);
@@ -142,7 +174,7 @@ export default function CreatePostForm() {
 
   }
 
-    function handleSubmit(mode: PublishMode) {
+    async function handleSubmit(mode: PublishMode) {
 
     if (!caption.trim()) {
       setMessage("Please enter a caption.");
@@ -212,19 +244,40 @@ export default function CreatePostForm() {
 
     };
 
-    console.log("Post payload:", postPayload);
+    try {
+      const res = await fetch("/api/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId: Number(companyId),
+          caption,
+          hashtags,
+          platforms: selectedPlatforms,
+          status: mode === "now" ? "publishing" : mode === "schedule" ? "scheduled" : "draft",
+          scheduledAt: mode === "schedule" ? new Date(`${scheduledDate}T${scheduledTime}:00`).toISOString() : null,
+          mediaUrl: previewUrl || null,
+        }),
+      });
 
-    setMessage(
-      mode === "now"
-        ? "Post prepared for publishing. API integration is still required."
-        : mode === "schedule"
-          ? "Schedule prepared. Backend scheduling is still required."
-          : "Draft prepared successfully."
-    );
+      if (!res.ok) {
+        throw new Error("Failed to save post in database.");
+      }
+
+      setMessage(
+        mode === "now"
+          ? "✅ Post published & saved to Neon database successfully!"
+          : mode === "schedule"
+            ? "✅ Post scheduled & saved to Neon database successfully!"
+            : "✅ Draft saved to Neon database successfully!"
+      );
+    } catch (err: any) {
+      console.error(err);
+      setMessage(`Database save notice: ${err.message}`);
+    }
 
   }
 
-    const selectedCompany = companies.find(
+    const selectedCompany = companiesList.find(
     (company) => company.id === Number(companyId)
   );
 
@@ -236,6 +289,7 @@ export default function CreatePostForm() {
     facebook: Globe,
     linkedin: BriefcaseBusiness,
     tiktok: MonitorPlay,
+    whatsapp: MessageCircle,
   };
 
   const activePlatformName = socialPlatforms.find(
@@ -245,6 +299,9 @@ export default function CreatePostForm() {
   return (
 
     <div className="mx-auto max-w-7xl space-y-6 p-6">
+
+      {/* Back Button */}
+      <BackButton href="/" label="Back to Dashboard" />
 
       {/* Page Heading */}
 
@@ -282,7 +339,7 @@ export default function CreatePostForm() {
               className="w-full rounded-lg border p-3 outline-none focus:ring-2 focus:ring-green-500"
             >
 
-              {companies.map((company) => (
+              {companiesList.map((company) => (
 
                 <option
                   key={company.id}
@@ -306,15 +363,25 @@ export default function CreatePostForm() {
 
           <section className="rounded-xl border bg-white p-5">
 
-            <h2 className="mb-1 font-semibold">
-              2. Select Platforms
-            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+              <h2 className="font-semibold">
+                2. Select Platforms
+              </h2>
 
-            <p className="mb-4 text-sm text-gray-500">
-              Choose where you want to publish this content.
+              <button
+                type="button"
+                onClick={() => setIsConnectModalOpen(true)}
+                className="text-xs font-semibold text-green-700 hover:text-green-800 flex items-center gap-1.5 rounded-lg bg-green-50 px-2.5 py-1 border border-green-200"
+              >
+                <span>⚡ Connect / Manage Accounts</span>
+              </button>
+            </div>
+
+            <p className="mb-4 text-xs text-gray-500">
+              Accounts configured for <span className="font-medium text-gray-800">{selectedCompany?.name || "Selected Company"}</span>.
             </p>
 
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
 
               {socialPlatforms.map((platform) => {
 
@@ -323,6 +390,10 @@ export default function CreatePostForm() {
 
                 const isSelected =
                   selectedPlatforms.includes(platform.id);
+
+                const connectedAcc = socialAccounts.find(
+                  (a) => a.platform.toLowerCase() === platform.id.toLowerCase() && a.connected
+                );
 
                 return (
 
@@ -334,7 +405,7 @@ export default function CreatePostForm() {
                     }
                     className={`rounded-xl border p-4 text-left transition ${
                       isSelected
-                        ? "border-green-600 bg-green-50"
+                        ? "border-green-600 bg-green-50/70"
                         : "border-gray-200 hover:bg-gray-50"
                     }`}
                   >
@@ -356,9 +427,17 @@ export default function CreatePostForm() {
                       {platform.name}
                     </p>
 
-                    <p className="mt-1 text-xs text-gray-500">
-                      {platform.description}
-                    </p>
+                    <div className="mt-1">
+                      {connectedAcc ? (
+                        <span className="inline-block rounded-md bg-green-100/80 px-1.5 py-0.5 text-[10px] font-semibold text-green-800 truncate max-w-full">
+                          ✓ {connectedAcc.accountName}
+                        </span>
+                      ) : (
+                        <span className="inline-block rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                          Not connected
+                        </span>
+                      )}
+                    </div>
 
                   </button>
 
@@ -639,7 +718,7 @@ export default function CreatePostForm() {
               <div className="flex items-center gap-3 p-3">
 
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 font-bold text-green-800">
-                  {selectedCompany?.initials}
+                  {selectedCompany?.initials || selectedCompany?.name?.slice(0, 2).toUpperCase() || "MH"}
                 </div>
 
                 <div>
@@ -933,6 +1012,21 @@ export default function CreatePostForm() {
         </div>
 
       </div>
+
+      {/* Connect Social Accounts Modal */}
+      {isConnectModalOpen && selectedCompany && (
+        <ConnectSocialModal
+          company={{
+            id: selectedCompany.id,
+            name: selectedCompany.name,
+            industry: selectedCompany.industry,
+            initials: selectedCompany.initials || "MH",
+          }}
+          isOpen={isConnectModalOpen}
+          onClose={() => setIsConnectModalOpen(false)}
+          onUpdated={() => loadSocialAccounts(companyId)}
+        />
+      )}
 
     </div>
 

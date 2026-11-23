@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Sidebar from "@/components/Sidebar";
+import Header from "@/components/Header";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -13,8 +15,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <body className="min-h-screen bg-gray-50 text-gray-900 antialiased" suppressHydrationWarning>
+        <div className="flex min-h-screen">
+          <Sidebar />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <Header />
+            <div className="flex-1">{children}</div>
+          </div>
+        </div>
+      </body>
     </html>
   );
 }

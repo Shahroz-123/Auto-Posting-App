@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react";
-import { companies } from "@/lib/data";
+
+import { useEffect, useState } from "react";
 import {
   CalendarDays,
   Clock3,
@@ -16,7 +16,9 @@ import {
   ListTodo,
   ArrowUpRight,
   Circle,
+  Loader2,
 } from "lucide-react";
+import Link from "next/link";
 
 /* ----------------------------------
    TYPES
@@ -24,6 +26,18 @@ import {
 
 interface DashboardSectionsProps {
   selectedCompany: string;
+  pipelineData?: {
+    draft: number;
+    inReview: number;
+    scheduled: number;
+    published: number;
+  };
+  companiesList?: {
+    id: number;
+    name: string;
+    industry: string;
+    initials: string;
+  }[];
 }
 
 interface PipelineItem {
@@ -42,6 +56,7 @@ interface Task {
   due: string;
   completed: boolean;
 }
+
 interface CalendarEvent {
   id: number;
   companyId: number;
@@ -51,173 +66,6 @@ interface CalendarEvent {
   time: string;
   platform: string;
 }
-
-/* ----------------------------------
-   SAMPLE PIPELINE DATA
----------------------------------- */
-
-const pipelineData: Record<number, PipelineItem[]> = {
-  1: [
-    { label: "Draft", count: 4, color: "bg-gray-400", width: "30%" },
-    { label: "In Review", count: 2, color: "bg-amber-400", width: "20%" },
-    { label: "Scheduled", count: 5, color: "bg-blue-500", width: "25%" },
-    { label: "Published", count: 8, color: "bg-green-500", width: "25%" },
-  ],
-  2: [
-    { label: "Draft", count: 3, color: "bg-gray-400", width: "30%" },
-    { label: "In Review", count: 1, color: "bg-amber-400", width: "20%" },
-    { label: "Scheduled", count: 2, color: "bg-blue-500", width: "25%" },
-    { label: "Published", count: 6, color: "bg-green-500", width: "25%" },
-  ],
-  3: [
-    { label: "Draft", count: 2, color: "bg-gray-400", width: "30%" },
-    { label: "In Review", count: 3, color: "bg-amber-400", width: "20%" },
-    { label: "Scheduled", count: 4, color: "bg-blue-500", width: "25%" },
-    { label: "Published", count: 5, color: "bg-green-500", width: "25%" },
-  ],
-  4: [
-    { label: "Draft", count: 3, color: "bg-gray-400", width: "30%" },
-    { label: "In Review", count: 2, color: "bg-amber-400", width: "20%" },
-    { label: "Scheduled", count: 3, color: "bg-blue-500", width: "25%" },
-    { label: "Published", count: 7, color: "bg-green-500", width: "25%" },
-  ],
-  5: [
-    { label: "Draft", count: 1, color: "bg-gray-400", width: "30%" },
-    { label: "In Review", count: 2, color: "bg-amber-400", width: "20%" },
-    { label: "Scheduled", count: 2, color: "bg-blue-500", width: "25%" },
-    { label: "Published", count: 4, color: "bg-green-500", width: "25%" },
-  ],
-  6: [
-    { label: "Draft", count: 2, color: "bg-gray-400", width: "30%" },
-    { label: "In Review", count: 1, color: "bg-amber-400", width: "20%" },
-    { label: "Scheduled", count: 3, color: "bg-blue-500", width: "25%" },
-    { label: "Published", count: 5, color: "bg-green-500", width: "25%" },
-  ],
-  7: [
-    { label: "Draft", count: 4, color: "bg-gray-400", width: "30%" },
-    { label: "In Review", count: 2, color: "bg-amber-400", width: "20%" },
-    { label: "Scheduled", count: 2, color: "bg-blue-500", width: "25%" },
-    { label: "Published", count: 6, color: "bg-green-500", width: "25%" },
-  ],
-  8: [
-    { label: "Draft", count: 2, color: "bg-gray-400", width: "30%" },
-    { label: "In Review", count: 1, color: "bg-amber-400", width: "20%" },
-    { label: "Scheduled", count: 3, color: "bg-blue-500", width: "25%" },
-    { label: "Published", count: 5, color: "bg-green-500", width: "25%" },
-  ],
-};
-
-/* ----------------------------------
-   SAMPLE TASK DATA
----------------------------------- */
-
-const initialTasks: Task[] = [
-  {
-    id: 1,
-    title: "Finalize Instagram campaign",
-    companyId: 1,
-    company: "Company One",
-    priority: "High",
-    due: "2026-11-17",
-    completed: false,
-  },
-  {
-    id: 2,
-    title: "Review product launch creatives",
-    companyId: 4,
-    company: "Company Four",
-    priority: "High",
-    due: "2026-11-17",
-    completed: false,
-  },
-  {
-    id: 3,
-    title: "Prepare LinkedIn content",
-    companyId: 2,
-    company: "Company Two",
-    priority: "Medium",
-    due: "2026-11-18",
-    completed: false,
-  },
-  {
-    id: 4,
-    title: "Upload weekly video assets",
-    companyId: 5,
-    company: "Company Five",
-    priority: "Low",
-    due: "2026-11-20",
-    completed: false,
-  },
-  {
-    id: 5,
-    title: "Prepare healthcare awareness post",
-    companyId: 3,
-    company: "Company Three",
-    priority: "High",
-    due: "2026-11-18",
-    completed: false,
-  },
-  {
-    id: 6,
-    title: "Review fashion campaign",
-    companyId: 7,
-    company: "Company Seven",
-    priority: "Medium",
-    due: "2026-11-21",
-    completed: false,
-  },
-];
-/* ----------------------------------
-   SAMPLE CALENDAR DATA
----------------------------------- */
-
-const weekEvents: CalendarEvent[] = [
-  {
-    id: 1,
-    companyId: 1,
-    day: "MON",
-    date: "16",
-    title: "Instagram campaign",
-    time: "10:00 AM",
-    platform: "Instagram",
-  },
-  {
-    id: 2,
-    companyId: 2,
-    day: "TUE",
-    date: "17",
-    title: "LinkedIn company update",
-    time: "12:30 PM",
-    platform: "LinkedIn",
-  },
-  {
-    id: 3,
-    companyId: 4,
-    day: "WED",
-    date: "18",
-    title: "Product launch video",
-    time: "02:00 PM",
-    platform: "TikTok",
-  },
-  {
-    id: 4,
-    companyId: 3,
-    day: "THU",
-    date: "19",
-    title: "Healthcare awareness post",
-    time: "11:00 AM",
-    platform: "Facebook",
-  },
-  {
-    id: 5,
-    companyId: 5,
-    day: "FRI",
-    date: "20",
-    title: "Weekly marketing review",
-    time: "03:00 PM",
-    platform: "Internal",
-  },
-];
 
 /* ----------------------------------
    INTEGRATED TOOLS
@@ -283,7 +131,6 @@ function SectionHeading({
 
       <div>
         <h2 className="text-base font-semibold text-gray-900">{title}</h2>
-
         <p className="mt-1 text-xs text-gray-500">{subtitle}</p>
       </div>
     </div>
@@ -296,149 +143,241 @@ function SectionHeading({
 
 export default function DashboardSections({
   selectedCompany,
+  pipelineData,
+  companiesList = [],
 }: DashboardSectionsProps) {
-  // Get the selected company's pipeline.
-  // When "all" is selected, combine all company statistics.
-
-  const pipeline: PipelineItem[] =
-    selectedCompany === "all"
-      ? [
-          {
-            label: "Draft",
-            count: Object.values(pipelineData)
-              .flat()
-              .filter((item) => item.label === "Draft")
-              .reduce((sum, item) => sum + item.count, 0),
-            color: "bg-gray-400",
-            width: "30%",
-          },
-          {
-            label: "In Review",
-            count: Object.values(pipelineData)
-              .flat()
-              .filter((item) => item.label === "In Review")
-              .reduce((sum, item) => sum + item.count, 0),
-            color: "bg-amber-400",
-            width: "20%",
-          },
-          {
-            label: "Scheduled",
-            count: Object.values(pipelineData)
-              .flat()
-              .filter((item) => item.label === "Scheduled")
-              .reduce((sum, item) => sum + item.count, 0),
-            color: "bg-blue-500",
-            width: "25%",
-          },
-          {
-            label: "Published",
-            count: Object.values(pipelineData)
-              .flat()
-              .filter((item) => item.label === "Published")
-              .reduce((sum, item) => sum + item.count, 0),
-            color: "bg-green-500",
-            width: "25%",
-          },
-        ]
-      : (pipelineData[Number(selectedCompany)] ?? []);
-
-  // Filter tasks by selected company.
-
-  const filteredTasks = initialTasks.filter(
-    (task) =>
-      selectedCompany === "all" ||
-      task.companyId.toString() === selectedCompany,
-  );
-
-  // Filter calendar events by selected company.
-
-  const filteredEvents = weekEvents.filter(
-    (event) =>
-      selectedCompany === "all" ||
-      event.companyId.toString() === selectedCompany,
-  );
-
-  const [tasks, setTasks] = useState<Task[]>(initialTasks);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [loadingTasks, setLoadingTasks] = useState(true);
 
   const [showTaskForm, setShowTaskForm] = useState(false);
-
   const [newTaskTitle, setNewTaskTitle] = useState("");
-
-  const [newTaskCompanyId, setNewTaskCompanyId] = useState("1");
-
-  const [newTaskPriority, setNewTaskPriority] = useState<
-    "High" | "Medium" | "Low"
-  >("Medium");
-
+  const [newTaskCompanyId, setNewTaskCompanyId] = useState("");
+  const [newTaskPriority, setNewTaskPriority] = useState<"High" | "Medium" | "Low">("Medium");
   const [newTaskDue, setNewTaskDue] = useState("");
 
-  // Add a new task
-  function handleAddTask(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!newTaskTitle.trim() || !newTaskDue) {
-      return;
+  useEffect(() => {
+    if (companiesList.length > 0 && !newTaskCompanyId) {
+      setNewTaskCompanyId(companiesList[0].id.toString());
     }
+  }, [companiesList, newTaskCompanyId]);
+
+  useEffect(() => {
+    async function loadTasksAndEvents() {
+      try {
+        setLoadingTasks(true);
+        const [tasksRes, postsRes] = await Promise.all([
+          fetch("/api/tasks"),
+          fetch("/api/posts"),
+        ]);
+
+        if (tasksRes.ok) {
+          const rawTasks = await tasksRes.json();
+          if (Array.isArray(rawTasks)) {
+            setTasks(
+              rawTasks.map((t: any) => ({
+                id: t.id,
+                title: t.title,
+                companyId: t.companyId,
+                company: t.company?.name || `Company ${t.companyId}`,
+                priority:
+                  t.priority === "HIGH"
+                    ? "High"
+                    : t.priority === "LOW"
+                    ? "Low"
+                    : "Medium",
+                due: t.dueDate
+                  ? new Date(t.dueDate).toISOString().split("T")[0]
+                  : "No date",
+                completed: Boolean(t.completed),
+              }))
+            );
+          }
+        }
+
+        if (postsRes.ok) {
+          const rawPosts = await postsRes.json();
+          if (Array.isArray(rawPosts)) {
+            const dayNames = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+            setEvents(
+              rawPosts
+                .filter(
+                  (p: any) =>
+                    p.status === "scheduled" ||
+                    p.status === "publishing" ||
+                    p.scheduledAt
+                )
+                .slice(0, 6)
+                .map((p: any) => {
+                  const dateObj = p.scheduledAt
+                    ? new Date(p.scheduledAt)
+                    : new Date(p.createdAt);
+                  return {
+                    id: p.id,
+                    companyId: p.companyId,
+                    day: dayNames[dateObj.getDay()],
+                    date: dateObj.getDate().toString(),
+                    title: p.caption
+                      ? p.caption.slice(0, 30) + (p.caption.length > 30 ? "..." : "")
+                      : "Scheduled Post",
+                    time: dateObj.toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }),
+                    platform:
+                      Array.isArray(p.platforms) && p.platforms.length > 0
+                        ? p.platforms[0]
+                        : "Instagram",
+                  };
+                })
+            );
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load dashboard tasks/events from DB:", err);
+      } finally {
+        setLoadingTasks(false);
+      }
+    }
+
+    loadTasksAndEvents();
+  }, []);
+
+  // Content & Social Pipeline derived from real database
+  const draftCount = pipelineData?.draft ?? 0;
+  const inReviewCount = pipelineData?.inReview ?? 0;
+  const scheduledCount = pipelineData?.scheduled ?? 0;
+  const publishedCount = pipelineData?.published ?? 0;
+  const totalInPipeline = draftCount + inReviewCount + scheduledCount + publishedCount || 1;
+
+  const pipeline: PipelineItem[] = [
+    {
+      label: "Draft",
+      count: draftCount,
+      color: "bg-gray-400",
+      width: `${Math.round((draftCount / totalInPipeline) * 100)}%`,
+    },
+    {
+      label: "In Review",
+      count: inReviewCount,
+      color: "bg-amber-400",
+      width: `${Math.round((inReviewCount / totalInPipeline) * 100)}%`,
+    },
+    {
+      label: "Scheduled",
+      count: scheduledCount,
+      color: "bg-blue-500",
+      width: `${Math.round((scheduledCount / totalInPipeline) * 100)}%`,
+    },
+    {
+      label: "Published",
+      count: publishedCount,
+      color: "bg-green-500",
+      width: `${Math.round((publishedCount / totalInPipeline) * 100)}%`,
+    },
+  ];
+
+  // Filter tasks by selected company
+  const filteredTasks = tasks.filter(
+    (task) =>
+      selectedCompany === "all" || task.companyId.toString() === selectedCompany
+  );
+
+  // Filter calendar events by selected company
+  const filteredEvents = events.filter(
+    (event) =>
+      selectedCompany === "all" || event.companyId.toString() === selectedCompany
+  );
+
+  // Add a new task directly to database
+  async function handleAddTask(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!newTaskTitle.trim() || !newTaskDue) return;
 
     const companyId =
       selectedCompany === "all"
-        ? Number(newTaskCompanyId)
+        ? Number(newTaskCompanyId || companiesList[0]?.id || 1)
         : Number(selectedCompany);
 
-    const selectedCompanyData = companies.find(
-      (company) => company.id === companyId,
-    );
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId,
+          title: newTaskTitle.trim(),
+          priority: newTaskPriority,
+          dueDate: newTaskDue,
+        }),
+      });
 
-    if (!selectedCompanyData) {
-      return;
+      if (res.ok) {
+        const created = await res.json();
+        setTasks((prev) => [
+          ...prev,
+          {
+            id: created.id,
+            title: created.title,
+            companyId: created.companyId,
+            company: created.company?.name || `Company ${created.companyId}`,
+            priority: newTaskPriority,
+            due: newTaskDue,
+            completed: false,
+          },
+        ]);
+        setNewTaskTitle("");
+        setNewTaskPriority("Medium");
+        setNewTaskDue("");
+        setShowTaskForm(false);
+      }
+    } catch (err) {
+      console.error("Failed to add task to database:", err);
     }
-
-    const newTask: Task = {
-      id: Date.now(),
-      title: newTaskTitle.trim(),
-      companyId,
-      company: selectedCompanyData.name,
-      priority: newTaskPriority,
-      due: newTaskDue,
-      completed: false,
-    };
-
-    setTasks((previousTasks) => [...previousTasks, newTask]);
-
-    // Reset form
-    setNewTaskTitle("");
-    setNewTaskPriority("Medium");
-    setNewTaskDue("");
-    setShowTaskForm(false);
   }
 
-  // Mark task as completed or pending
-  function toggleTaskCompletion(taskId: number) {
-    setTasks((previousTasks) =>
-      previousTasks.map((task) =>
-        task.id === taskId ? { ...task, completed: !task.completed } : task,
-      ),
+  // Toggle task completion in Neon DB
+  async function toggleTaskCompletion(taskId: number) {
+    const target = tasks.find((t) => t.id === taskId);
+    if (!target) return;
+    const nextCompleted = !target.completed;
+
+    // Optimistic UI update
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, completed: nextCompleted } : t))
     );
+
+    try {
+      await fetch("/api/tasks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: taskId, completed: nextCompleted }),
+      });
+    } catch (err) {
+      console.error("Failed to toggle task in DB:", err);
+    }
   }
+
+  const selectedCompanyName =
+    selectedCompany === "all"
+      ? "All Companies"
+      : companiesList.find((c) => c.id.toString() === selectedCompany)?.name ||
+        `Company ${selectedCompany}`;
+
   return (
     <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-3">
       {/* LEFT COLUMN */}
-
       <div className="space-y-6 xl:col-span-2">
         {/* CONTENT & SOCIAL PIPELINE */}
-
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <SectionHeading
               title="Content & Social Pipeline"
-              subtitle="Track content from creation to publication"
+              subtitle="Live content stats from Neon database"
               icon={FileText}
             />
 
             <span className="mb-5 rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700">
-              {selectedCompany === "all"
-                ? "All Companies"
-                : `Company ${selectedCompany}`}
+              {selectedCompanyName}
             </span>
           </div>
 
@@ -446,11 +385,9 @@ export default function DashboardSections({
             {pipeline.map((item) => (
               <div key={item.label} className="rounded-xl bg-gray-50 p-4">
                 <p className="text-sm text-gray-500">{item.label}</p>
-
                 <p className="mt-2 text-2xl font-bold text-gray-900">
                   {item.count}
                 </p>
-
                 <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-gray-200">
                   <div
                     className={`h-full rounded-full ${item.color}`}
@@ -463,120 +400,121 @@ export default function DashboardSections({
 
           <div className="mt-5 flex flex-wrap items-center gap-4 border-t border-gray-100 pt-4 text-xs text-gray-500">
             <span className="flex items-center gap-1.5">
-              <Camera size={14} />
-              Instagram
+              <Camera size={14} /> Instagram
             </span>
-
             <span className="flex items-center gap-1.5">
-              <Globe size={14} />
-              Facebook
+              <Globe size={14} /> Facebook
             </span>
-
             <span className="flex items-center gap-1.5">
-              <BriefcaseBusiness size={14} />
-              LinkedIn
+              <BriefcaseBusiness size={14} /> LinkedIn
             </span>
-
             <span className="flex items-center gap-1.5">
-              <Video size={14} />
-              TikTok
+              <Video size={14} /> TikTok
             </span>
           </div>
         </section>
 
         {/* PRIORITY TASK MATRIX */}
-
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <SectionHeading
               title="Priority Task Matrix"
-              subtitle="Keep important marketing work on track"
+              subtitle="Active tasks stored in database"
               icon={ListTodo}
             />
 
-            <button className="mb-5 text-sm font-medium text-green-700 hover:text-green-800">
+            <Link
+              href="/tasks"
+              className="mb-5 text-sm font-medium text-green-700 hover:text-green-800"
+            >
               View all tasks →
-            </button>
+            </Link>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[580px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 text-xs text-gray-500">
-                  <th className="pb-3 font-medium">Task</th>
-                  <th className="pb-3 font-medium">Company</th>
-                  <th className="pb-3 font-medium">Priority</th>
-                  <th className="pb-3 font-medium">Due date</th>
-                  <th className="pb-3 font-medium">Status</th>
-                </tr>
-              </thead>
+          {loadingTasks ? (
+            <div className="flex h-36 items-center justify-center">
+              <Loader2 className="animate-spin text-green-700" size={24} />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[580px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 text-xs text-gray-500">
+                    <th className="pb-3 font-medium">Task</th>
+                    <th className="pb-3 font-medium">Company</th>
+                    <th className="pb-3 font-medium">Priority</th>
+                    <th className="pb-3 font-medium">Due date</th>
+                    <th className="pb-3 font-medium">Status</th>
+                  </tr>
+                </thead>
 
-              <tbody>
-                {filteredTasks.map((task) => (
-                  <tr
-                    key={task.id}
-                    className="border-b border-gray-50 last:border-0"
-                  >
-                    <td className="py-4 pr-3">
-                      <span
-                        className={
-                          task.completed
-                            ? "text-gray-400 line-through"
-                            : "font-medium text-gray-800"
-                        }
-                      >
-                        {task.title}
-                      </span>
-                    </td>
+                <tbody>
+                  {filteredTasks.map((task) => (
+                    <tr
+                      key={task.id}
+                      className="border-b border-gray-50 last:border-0"
+                    >
+                      <td className="py-4 pr-3">
+                        <span
+                          className={
+                            task.completed
+                              ? "text-gray-400 line-through"
+                              : "font-medium text-gray-800"
+                          }
+                        >
+                          {task.title}
+                        </span>
+                      </td>
 
-                    <td className="py-4 pr-3 text-gray-500">{task.company}</td>
+                      <td className="py-4 pr-3 text-gray-500">{task.company}</td>
 
-                    <td className="py-4 pr-3">
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                          task.priority === "High"
-                            ? "bg-red-50 text-red-700"
-                            : task.priority === "Medium"
+                      <td className="py-4 pr-3">
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                            task.priority === "High"
+                              ? "bg-red-50 text-red-700"
+                              : task.priority === "Medium"
                               ? "bg-amber-50 text-amber-700"
                               : "bg-gray-100 text-gray-600"
-                        }`}
+                          }`}
+                        >
+                          {task.priority}
+                        </span>
+                      </td>
+
+                      <td className="whitespace-nowrap py-4 text-gray-500">
+                        {task.due}
+                      </td>
+
+                      <td className="py-4">
+                        <button
+                          onClick={() => toggleTaskCompletion(task.id)}
+                          className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                            task.completed
+                              ? "bg-green-50 text-green-700 hover:bg-green-100"
+                              : "bg-blue-50 text-blue-700 hover:bg-blue-100"
+                          }`}
+                        >
+                          {task.completed ? "Completed" : "Mark complete"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+
+                  {filteredTasks.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="py-8 text-center text-sm text-gray-400"
                       >
-                        {task.priority}
-                      </span>
-                    </td>
-
-                    <td className="whitespace-nowrap py-4 text-gray-500">
-                      {task.due}
-                    </td>
-
-                    <td className="py-4">
-                      <button
-                        onClick={() => toggleTaskCompletion(task.id)}
-                        className={`rounded-full px-3 py-1 text-xs font-medium ${
-                          task.completed
-                            ? "bg-green-50 text-green-700"
-                            : "bg-blue-50 text-blue-700"
-                        }`}
-                      >
-                        {task.completed ? "Completed" : "Mark complete"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-
-                {filteredTasks.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={5}
-                      className="py-8 text-center text-sm text-gray-400"
-                    >
-                      No tasks available for this company.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                        No tasks found for this workspace.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           <button
             onClick={() => setShowTaskForm(!showTaskForm)}
@@ -593,13 +531,10 @@ export default function DashboardSections({
             >
               <h3 className="font-semibold text-gray-900">Create New Task</h3>
 
-              {/* Task title */}
-
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
                   Task Title
                 </label>
-
                 <input
                   type="text"
                   value={newTaskTitle}
@@ -610,13 +545,10 @@ export default function DashboardSections({
                 />
               </div>
 
-              {/* Company selection */}
-
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
                   Assign Company
                 </label>
-
                 <select
                   value={
                     selectedCompany === "all"
@@ -627,32 +559,23 @@ export default function DashboardSections({
                   disabled={selectedCompany !== "all"}
                   className="w-full rounded-lg border border-gray-200 bg-white p-3 text-sm disabled:bg-gray-100"
                 >
-                  {companies.map((company) => (
+                  {companiesList.map((company) => (
                     <option key={company.id} value={company.id.toString()}>
-                      {company.name}
+                      {company.name} ({company.industry})
                     </option>
                   ))}
                 </select>
-
-                {selectedCompany !== "all" && (
-                  <p className="mt-1 text-xs text-gray-500">
-                    Task will be assigned to the selected company.
-                  </p>
-                )}
               </div>
-
-              {/* Priority */}
 
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
                   Priority
                 </label>
-
                 <select
                   value={newTaskPriority}
                   onChange={(e) =>
                     setNewTaskPriority(
-                      e.target.value as "High" | "Medium" | "Low",
+                      e.target.value as "High" | "Medium" | "Low"
                     )
                   }
                   className="w-full rounded-lg border border-gray-200 bg-white p-3 text-sm"
@@ -663,13 +586,10 @@ export default function DashboardSections({
                 </select>
               </div>
 
-              {/* Deadline */}
-
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
                   Due Date
                 </label>
-
                 <input
                   type="date"
                   value={newTaskDue}
@@ -678,8 +598,6 @@ export default function DashboardSections({
                   className="w-full rounded-lg border border-gray-200 bg-white p-3 text-sm"
                 />
               </div>
-
-              {/* Submit */}
 
               <button
                 type="submit"
@@ -693,32 +611,23 @@ export default function DashboardSections({
       </div>
 
       {/* RIGHT COLUMN */}
-
       <div className="space-y-6">
         {/* CALENDAR WEEK */}
-
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <div className="flex items-start justify-between">
             <SectionHeading
               title="Calendar Week"
-              subtitle="Upcoming posts and activities"
+              subtitle="Upcoming posts from database"
               icon={CalendarDays}
             />
 
-            <button
+            <Link
+              href="/planner"
               aria-label="Open calendar"
               className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
             >
               <ArrowUpRight size={17} />
-            </button>
-          </div>
-
-          <div className="mb-4 rounded-xl bg-green-50 p-3">
-            <p className="text-xs font-medium text-green-700">THIS WEEK</p>
-
-            <p className="mt-1 text-lg font-semibold text-gray-900">
-              November 16–20, 2026
-            </p>
+            </Link>
           </div>
 
           <div className="space-y-4">
@@ -728,7 +637,6 @@ export default function DashboardSections({
                   <p className="text-[10px] font-semibold text-gray-400">
                     {event.day}
                   </p>
-
                   <p className="mt-0.5 text-base font-bold text-gray-800">
                     {event.date}
                   </p>
@@ -738,7 +646,6 @@ export default function DashboardSections({
                   <p className="text-sm font-medium text-gray-800">
                     {event.title}
                   </p>
-
                   <p className="mt-1 flex items-center gap-1 text-xs text-gray-500">
                     <Clock3 size={12} />
                     {event.time} · {event.platform}
@@ -749,18 +656,20 @@ export default function DashboardSections({
 
             {filteredEvents.length === 0 && (
               <p className="py-6 text-center text-sm text-gray-400">
-                No scheduled activities for this company.
+                No scheduled posts found in database.
               </p>
             )}
           </div>
 
-          <button className="mt-4 w-full rounded-lg border border-gray-200 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
-            Open full calendar
-          </button>
+          <Link
+            href="/planner"
+            className="mt-4 block w-full rounded-lg border border-gray-200 py-2.5 text-center text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Open full planner
+          </Link>
         </section>
 
         {/* INTEGRATED TOOLS */}
-
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <SectionHeading
             title="Integrated Tools"
@@ -771,7 +680,6 @@ export default function DashboardSections({
           <div className="space-y-3">
             {tools.map((tool) => {
               const ToolIcon = tool.icon;
-
               return (
                 <div
                   key={tool.name}
@@ -785,7 +693,6 @@ export default function DashboardSections({
                     <p className="text-sm font-semibold text-gray-800">
                       {tool.name}
                     </p>
-
                     <p className="mt-0.5 text-xs text-gray-500">
                       {tool.description}
                     </p>

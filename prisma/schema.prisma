@@ -1,6 +1,5 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -16,14 +15,23 @@ enum SocialPlatform {
   FACEBOOK
   LINKEDIN
   TIKTOK
+  WHATSAPP
 }
 
 enum PostStatus {
   DRAFT
+  IN_REVIEW
   SCHEDULED
   PUBLISHING
   PUBLISHED
   FAILED
+}
+
+enum PublishStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  RETRYING
 }
 
 enum TaskPriority {
@@ -32,22 +40,72 @@ enum TaskPriority {
   LOW
 }
 
+enum UserRole {
+  ADMIN
+  STRATEGIST
+  MANAGER
+  DESIGNER
+  COPYWRITER
+}
+
 // =============================
-// COMPANY
+// USER & TEAM
+// =============================
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  role      UserRole @default(MANAGER)
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assignedTasks   Task[]          @relation("AssignedTasks")
+  authoredPosts   Post[]          @relation("AuthoredPosts")
+  companyMembers  CompanyMember[]
+}
+
+// =============================
+// COMPANY (CLIENT WORKSPACE)
 // =============================
 
 model Company {
   id        Int      @id @default(autoincrement())
   name      String
-  industry   String
+  industry  String
   initials  String
+  website   String?
+  logoUrl   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   socialAccounts SocialAccount[]
-  posts         Post[]
-  tasks         Task[]
-  media         Media[]
+  posts          Post[]
+  tasks          Task[]
+  media          Media[]
+  members        CompanyMember[]
+  credentials    OAuthCredential[]
+  settings       WorkspaceSetting?
+}
+
+// =============================
+// COMPANY MEMBER (MANY-TO-MANY)
+// =============================
+
+model CompanyMember {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  companyId Int
+  role      String   @default("Manager")
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, companyId])
+  @@index([userId])
+  @@index([companyId])
 }
 
 // =============================
@@ -59,13 +117,36 @@ model SocialAccount {
   companyId   Int
   platform    SocialPlatform
   accountName String
-  connected   Boolean         @default(false)
-  createdAt  DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
+  connected   Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company    Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  credential OAuthCredential?
 
   @@index([companyId])
+}
+
+// =============================
+// OAUTH & API CREDENTIALS
+// =============================
+
+model OAuthCredential {
+  id              Int            @id @default(autoincrement())
+  companyId       Int
+  socialAccountId Int?           @unique
+  platform        SocialPlatform
+  accessToken     String         @db.Text
+  refreshToken    String?        @db.Text
+  tokenExpiresAt  DateTime?
+  scope           String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  socialAccount SocialAccount? @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, platform])
 }
 
 // =============================
@@ -73,20 +154,70 @@ model SocialAccount {
 // =============================
 
 model Post {
-  id          Int        @id @default(autoincrement())
+  id          Int              @id @default(autoincrement())
   companyId   Int
-  caption     String     @db.Text
+  authorId    Int?
+  caption     String           @db.Text
+  hashtags    String?          @db.Text
   platforms   SocialPlatform[]
-  status      PostStatus @default(DRAFT)
+  status      PostStatus       @default(DRAFT)
   scheduledAt DateTime?
-  mediaUrl   String?
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  publishedAt DateTime?
+  mediaUrl    String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company     Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  author      User?           @relation("AuthoredPosts", fields: [authorId], references: [id], onDelete: SetNull)
+  publishLogs PublishLog[]
+  analytics   PostAnalytics[]
 
   @@index([companyId])
+  @@index([authorId])
   @@index([status, scheduledAt])
+}
+
+// =============================
+// PUBLISH LOG (AUTO-POSTING ENGINE)
+// =============================
+
+model PublishLog {
+  id           Int            @id @default(autoincrement())
+  postId       Int
+  platform     SocialPlatform
+  status       PublishStatus  @default(PENDING)
+  externalId   String?        // ID returned by Instagram/FB/LinkedIn/TikTok API
+  externalUrl  String?        // Public link to live post
+  errorMessage String?        @db.Text
+  attemptCount Int            @default(1)
+  publishedAt  DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([status, platform])
+}
+
+// =============================
+// POST ANALYTICS (ENGAGEMENT)
+// =============================
+
+model PostAnalytics {
+  id          Int            @id @default(autoincrement())
+  postId      Int
+  platform    SocialPlatform
+  likes       Int            @default(0)
+  comments    Int            @default(0)
+  shares      Int            @default(0)
+  views       Int            @default(0)
+  reach       Int            @default(0)
+  recordedAt  DateTime       @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId, platform])
 }
 
 // =============================
@@ -94,23 +225,26 @@ model Post {
 // =============================
 
 model Task {
-  id          Int          @id @default(autoincrement())
-  companyId   Int
-  title       String
-  priority    TaskPriority @default(MEDIUM)
-  dueDate    DateTime
-  completed  Boolean      @default(false)
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  id           Int          @id @default(autoincrement())
+  companyId    Int
+  assignedToId Int?
+  title        String
+  priority     TaskPriority @default(MEDIUM)
+  dueDate      DateTime
+  completed    Boolean      @default(false)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company    Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  assignedTo User?   @relation("AssignedTasks", fields: [assignedToId], references: [id], onDelete: SetNull)
 
   @@index([companyId])
+  @@index([assignedToId])
   @@index([completed, dueDate])
 }
 
 // =============================
-// MEDIA
+// MEDIA ASSET
 // =============================
 
 model Media {
@@ -125,4 +259,22 @@ model Media {
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([companyId])
+}
+
+// =============================
+// WORKSPACE SETTINGS
+// =============================
+
+model WorkspaceSetting {
+  id              Int      @id @default(autoincrement())
+  companyId       Int?     @unique
+  timezone        String   @default("Asia/Karachi")
+  autoRetryFailed Boolean  @default(true)
+  smartTiming     Boolean  @default(true)
+  defaultHashtags String?  @db.Text
+  emailAlerts     Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  company Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
 }
