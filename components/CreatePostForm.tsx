@@ -16,9 +16,12 @@ import {
   X,
   Clock3,
   MonitorPlay,
+  Wand2,
+  Loader2,
 } from "lucide-react";
 import BackButton from "@/components/BackButton";
 import ConnectSocialModal, { SocialAccountItem } from "@/components/ConnectSocialModal";
+import AIGeneratorModal from "@/components/AIGeneratorModal";
 
 import {
   socialPlatforms,
@@ -37,6 +40,41 @@ export default function CreatePostForm() {
   const [companiesList, setCompaniesList] = useState<{ id: number; name: string; industry: string; initials?: string | null }[]>([]);
   const [socialAccounts, setSocialAccounts] = useState<SocialAccountItem[]>([]);
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
+  const [isAIModalOpen, setIsAIModalOpen] = useState(false);
+  const [quickPrompt, setQuickPrompt] = useState("");
+  const [generatingQuick, setGeneratingQuick] = useState(false);
+
+  const handleQuickGenerate = async () => {
+    try {
+      setGeneratingQuick(true);
+      setMessage("");
+      const res = await fetch("/api/ai/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: quickPrompt || "Announcing special offerings and client solutions",
+          companyName: selectedCompany?.name || "Our Company",
+          industry: selectedCompany?.industry || "Business",
+          platform: activePlatform,
+          tone: "engaging",
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setCaption(data.caption);
+        setHashtags(data.hashtags);
+        if (data.customCaptions) {
+          setCustomCaptions(data.customCaptions as any);
+        }
+        setMessage("✨ Full post generated! You can now Publish Now, Schedule, or Save Draft below.");
+      }
+    } catch (err: any) {
+      setMessage(`Generation error: ${err.message}`);
+    } finally {
+      setGeneratingQuick(false);
+    }
+  };
 
   const loadSocialAccounts = (cId: string) => {
     fetch(`/api/social-accounts?companyId=${cId}`)
@@ -245,6 +283,25 @@ export default function CreatePostForm() {
     };
 
     try {
+      let finalMediaUrl = previewUrl || null;
+      if (media) {
+        const formData = new FormData();
+        formData.append("file", media);
+        formData.append("companyId", companyId);
+        try {
+          const uploadRes = await fetch("/api/upload", {
+            method: "POST",
+            body: formData,
+          });
+          if (uploadRes.ok) {
+            const uploadJson = await uploadRes.json();
+            finalMediaUrl = uploadJson.url;
+          }
+        } catch (uploadErr) {
+          console.error("Media upload error:", uploadErr);
+        }
+      }
+
       const res = await fetch("/api/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -255,7 +312,7 @@ export default function CreatePostForm() {
           platforms: selectedPlatforms,
           status: mode === "now" ? "publishing" : mode === "schedule" ? "scheduled" : "draft",
           scheduledAt: mode === "schedule" ? new Date(`${scheduledDate}T${scheduledTime}:00`).toISOString() : null,
-          mediaUrl: previewUrl || null,
+          mediaUrl: finalMediaUrl,
         }),
       });
 
@@ -263,12 +320,26 @@ export default function CreatePostForm() {
         throw new Error("Failed to save post in database.");
       }
 
+      const createdPost = await res.json();
+
+      if (mode === "now" && createdPost?.id) {
+        try {
+          await fetch("/api/posts/publish", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ postId: createdPost.id }),
+          });
+        } catch (pubErr) {
+          console.error("Auto publish error:", pubErr);
+        }
+      }
+
       setMessage(
         mode === "now"
-          ? "✅ Post published & saved to Neon database successfully!"
+          ? "✅ Post generated & published across connected channels in Neon DB!"
           : mode === "schedule"
-            ? "✅ Post scheduled & saved to Neon database successfully!"
-            : "✅ Draft saved to Neon database successfully!"
+            ? "✅ Post generated & scheduled in Neon DB!"
+            : "✅ Post generated & saved as Draft in Neon DB!"
       );
     } catch (err: any) {
       console.error(err);
@@ -324,6 +395,53 @@ export default function CreatePostForm() {
         {/* LEFT: CONTENT EDITOR */}
 
         <div className="space-y-6 xl:col-span-2">
+
+          {/* Quick AI Post Generator by Description */}
+          <section className="rounded-2xl border-2 border-purple-200 bg-gradient-to-br from-purple-50/80 via-white to-green-50/50 p-6 shadow-sm">
+            <div className="flex items-center gap-2.5 mb-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-600 text-white shadow-xs">
+                <Sparkles size={18} />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-gray-900">
+                  Generate Complete Post from Description
+                </h2>
+                <p className="text-xs text-gray-500">
+                  Type your post idea below. AI will instantly generate caption, trending hashtags, and social channel variations.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              <textarea
+                value={quickPrompt}
+                onChange={(e) => setQuickPrompt(e.target.value)}
+                placeholder="e.g. Announce a limited-time 25% discount on all services for next weekend with free booking consultation."
+                rows={2}
+                className="w-full rounded-xl border border-gray-300 bg-white p-3 text-sm outline-none focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
+              />
+
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                <p className="text-xs text-gray-600">
+                  Active Client: <strong className="text-purple-900">{selectedCompany?.name || "Selected Company"}</strong> ({selectedCompany?.industry})
+                </p>
+
+                <button
+                  type="button"
+                  onClick={handleQuickGenerate}
+                  disabled={generatingQuick}
+                  className="flex items-center gap-2 rounded-xl bg-purple-600 px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-purple-700 transition disabled:opacity-50"
+                >
+                  {generatingQuick ? (
+                    <Loader2 size={15} className="animate-spin" />
+                  ) : (
+                    <Wand2 size={15} />
+                  )}
+                  <span>{generatingQuick ? "Crafting Post..." : "✨ Generate Post with AI"}</span>
+                </button>
+              </div>
+            </div>
+          </section>
 
           {/* Company Selection */}
 
@@ -472,15 +590,11 @@ export default function CreatePostForm() {
 
               <button
                 type="button"
-                onClick={() =>
-                  setMessage(
-                    "AI content generation will be connected in the next phase."
-                  )
-                }
-                className="flex items-center gap-2 rounded-lg bg-purple-50 px-3 py-2 text-sm font-medium text-purple-700"
+                onClick={() => setIsAIModalOpen(true)}
+                className="flex items-center gap-2 rounded-lg bg-purple-50 px-3 py-2 text-sm font-semibold text-purple-700 hover:bg-purple-100 transition border border-purple-200"
               >
                 <Sparkles size={16} />
-                AI Generate
+                <span>AI Generate</span>
               </button>
 
             </div>
@@ -1025,6 +1139,24 @@ export default function CreatePostForm() {
           isOpen={isConnectModalOpen}
           onClose={() => setIsConnectModalOpen(false)}
           onUpdated={() => loadSocialAccounts(companyId)}
+        />
+      )}
+
+      {/* AI Content & Hashtag Generator Modal */}
+      {isAIModalOpen && selectedCompany && (
+        <AIGeneratorModal
+          isOpen={isAIModalOpen}
+          onClose={() => setIsAIModalOpen(false)}
+          companyName={selectedCompany.name}
+          industry={selectedCompany.industry}
+          onApply={(data) => {
+            setCaption(data.caption);
+            setHashtags(data.hashtags);
+            if (data.customCaptions) {
+              setCustomCaptions(data.customCaptions as any);
+            }
+            setMessage("✨ AI generated caption and hashtags applied successfully!");
+          }}
         />
       )}
 

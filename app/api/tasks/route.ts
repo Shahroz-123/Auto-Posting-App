@@ -56,3 +56,22 @@ export async function PATCH(req: Request) {
   }
 }
 
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ error: "Task ID is required" }, { status: 400 });
+    }
+
+    await prisma.task.delete({
+      where: { id: Number(id) },
+    });
+
+    return NextResponse.json({ success: true, message: "Task deleted from database." });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+

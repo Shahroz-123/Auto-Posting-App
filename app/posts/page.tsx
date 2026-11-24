@@ -20,9 +20,11 @@ import {
   X,
   Sparkles,
   Loader2,
+  Send,
 } from "lucide-react";
 import BackButton from "@/components/BackButton";
 import { SocialPlatform } from "@/lib/data";
+import { useUserRole } from "@/components/UserRoleContext";
 
 interface PostRecord {
   id: number;
@@ -42,6 +44,7 @@ interface PostRecord {
 }
 
 export default function PostsPage() {
+  const { isAdmin } = useUserRole();
   const [posts, setPosts] = useState<PostRecord[]>([]);
   const [companies, setCompanies] = useState<{ id: number; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,6 +53,47 @@ export default function PostsPage() {
   const [selectedPlatform, setSelectedPlatform] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [previewPost, setPreviewPost] = useState<PostRecord | null>(null);
+  const [runningCron, setRunningCron] = useState(false);
+  const [publishingId, setPublishingId] = useState<number | null>(null);
+  const [statusAlert, setStatusAlert] = useState("");
+
+  const handleRunCron = async () => {
+    try {
+      setRunningCron(true);
+      setStatusAlert("");
+      const res = await fetch("/api/cron/publish", { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        setStatusAlert(`⚡ Auto-Posting Engine ran: ${data.processedCount} scheduled post(s) processed.`);
+        fetchPostsAndCompanies();
+      }
+    } catch (err: any) {
+      setStatusAlert(`Engine run error: ${err.message}`);
+    } finally {
+      setRunningCron(false);
+    }
+  };
+
+  const handlePublishNow = async (postId: number) => {
+    try {
+      setPublishingId(postId);
+      setStatusAlert("");
+      const res = await fetch("/api/posts/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setStatusAlert(data.message);
+        fetchPostsAndCompanies();
+      }
+    } catch (err: any) {
+      setStatusAlert(`Publishing error: ${err.message}`);
+    } finally {
+      setPublishingId(null);
+    }
+  };
 
   const fetchPostsAndCompanies = async () => {
     try {
@@ -146,8 +190,17 @@ export default function PostsPage() {
     }
   };
 
-  const handleDeletePost = (id: number) => {
-    setPosts(posts.filter((p) => p.id !== id));
+  const handleDeletePost = async (id: number) => {
+    if (!confirm("Are you sure you want to permanently delete this post from the database?")) return;
+    try {
+      const res = await fetch(`/api/posts?id=${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setPosts((prev) => prev.filter((p) => p.id !== id));
+        setStatusAlert("Post deleted from database successfully.");
+      }
+    } catch (err: any) {
+      console.error("Failed to delete post:", err);
+    }
   };
 
   const publishedCount = posts.filter((p) => p.status === "PUBLISHED").length;
@@ -171,14 +224,44 @@ export default function PostsPage() {
           </p>
         </div>
 
-        <Link
-          href="/create"
-          className="flex items-center gap-2 rounded-xl bg-green-700 px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-green-800"
-        >
-          <Plus size={18} />
-          <span>Create New Post</span>
-        </Link>
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={handleRunCron}
+            disabled={runningCron}
+            className="flex items-center gap-2 rounded-xl border border-green-700 bg-green-50 px-4 py-2.5 text-sm font-semibold text-green-800 shadow-xs transition hover:bg-green-100 disabled:opacity-50"
+          >
+            {runningCron ? (
+              <Loader2 size={16} className="animate-spin text-green-700" />
+            ) : (
+              <span>⚡</span>
+            )}
+            <span>{runningCron ? "Publishing Queue..." : "Run Auto-Posting Engine"}</span>
+          </button>
+
+          <Link
+            href="/create"
+            className="flex items-center gap-2 rounded-xl bg-green-700 px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-green-800"
+          >
+            <Plus size={18} />
+            <span>Create New Post</span>
+          </Link>
+        </div>
       </section>
+
+      {statusAlert && (
+        <div className="rounded-xl bg-green-50 border border-green-200 p-4 text-xs font-semibold text-green-900 flex items-center justify-between animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 size={16} className="text-green-700" />
+            <span>{statusAlert}</span>
+          </div>
+          <button
+            onClick={() => setStatusAlert("")}
+            className="text-gray-400 hover:text-gray-700"
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
 
       {/* Stats Counters */}
       <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -349,6 +432,22 @@ export default function PostsPage() {
                     {/* Actions */}
                     <td className="py-4 pr-2 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1.5">
+                        {post.status !== "PUBLISHED" && (
+                          <button
+                            onClick={() => handlePublishNow(post.id)}
+                            disabled={publishingId === post.id}
+                            title="Publish Now to Connected Channels"
+                            className="flex items-center gap-1 rounded-lg bg-green-700 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-green-800 transition disabled:opacity-50"
+                          >
+                            {publishingId === post.id ? (
+                              <Loader2 size={12} className="animate-spin" />
+                            ) : (
+                              <Send size={12} />
+                            )}
+                            <span>Publish</span>
+                          </button>
+                        )}
+
                         <button
                           onClick={() => setPreviewPost(post)}
                           title="Preview Post"
@@ -357,13 +456,15 @@ export default function PostsPage() {
                           <Eye size={16} />
                         </button>
 
-                        <button
-                          onClick={() => handleDeletePost(post.id)}
-                          title="Delete Post"
-                          className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 transition"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => handleDeletePost(post.id)}
+                            title="Delete Post from Database"
+                            className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 transition"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

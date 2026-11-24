@@ -11,6 +11,7 @@ import {
   Globe,
   BriefcaseBusiness,
   Video,
+  MessageCircle,
   Sparkles,
   CheckCircle2,
   Filter,
@@ -68,15 +69,38 @@ export default function ContentPlannerPage() {
     fetchPlannerData();
   }, []);
 
-  const daysOfWeek = [
-    { key: "Mon", label: "Monday", date: "Nov 16", dayIndex: 1 },
-    { key: "Tue", label: "Tuesday", date: "Nov 17", dayIndex: 2 },
-    { key: "Wed", label: "Wednesday", date: "Nov 18", dayIndex: 3 },
-    { key: "Thu", label: "Thursday", date: "Nov 19", dayIndex: 4 },
-    { key: "Fri", label: "Friday", date: "Nov 20", dayIndex: 5 },
-    { key: "Sat", label: "Saturday", date: "Nov 21", dayIndex: 6 },
-    { key: "Sun", label: "Sunday", date: "Nov 22", dayIndex: 0 },
-  ];
+  const getWeekDates = (offsetWeeks: number) => {
+    const today = new Date();
+    const currentDay = today.getDay();
+    const distanceToMonday = (currentDay + 6) % 7;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - distanceToMonday + offsetWeeks * 7);
+
+    const days = [];
+    const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const fullNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const monthName = d.toLocaleDateString("en-US", { month: "short" });
+      days.push({
+        key: dayNames[i],
+        label: fullNames[i],
+        date: `${monthName} ${d.getDate()}`,
+        dateObj: d,
+        dayIndex: d.getDay(),
+        isoDate: d.toISOString().split("T")[0],
+      });
+    }
+    return days;
+  };
+
+  const daysOfWeek = getWeekDates(currentWeekIndex);
+  const weekStart = daysOfWeek[0].date;
+  const weekEnd = daysOfWeek[6].date;
+  const yearString = daysOfWeek[0].dateObj.getFullYear();
+  const todayIso = new Date().toISOString().split("T")[0];
 
   const filteredPosts = posts.filter((item) => {
     return (
@@ -89,6 +113,8 @@ export default function ContentPlannerPage() {
     switch (platform.toLowerCase()) {
       case "instagram":
         return <Camera size={13} className="text-pink-600" />;
+      case "whatsapp":
+        return <MessageCircle size={13} className="text-green-600" />;
       case "facebook":
         return <Globe size={13} className="text-blue-600" />;
       case "linkedin":
@@ -158,7 +184,12 @@ export default function ContentPlannerPage() {
 
           <div className="rounded-xl bg-green-50 px-4 py-2 text-center">
             <p className="text-xs font-bold text-green-800">
-              Week {currentWeekIndex + 47} · November 16–22, 2026
+              {currentWeekIndex === 0
+                ? "This Week"
+                : currentWeekIndex > 0
+                ? `+${currentWeekIndex} Week`
+                : `${currentWeekIndex} Week`}{" "}
+              · {weekStart} – {weekEnd}, {yearString}
             </p>
           </div>
 
@@ -214,16 +245,14 @@ export default function ContentPlannerPage() {
         <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm overflow-x-auto">
           <div className="grid min-w-[900px] grid-cols-7 gap-3">
             {daysOfWeek.map((day, idx) => {
-              // Assign posts across the 7 days based on scheduled date or index distribution
               const dayEvents = filteredPosts.filter((post, postIdx) => {
                 if (post.scheduledAt) {
-                  const d = new Date(post.scheduledAt).getDay();
-                  return d === day.dayIndex;
+                  return post.scheduledAt.startsWith(day.isoDate);
                 }
-                return postIdx % 7 === idx;
+                return currentWeekIndex === 0 && postIdx % 7 === idx;
               });
 
-              const isToday = day.key === "Thu";
+              const isToday = day.isoDate === todayIso;
 
               return (
                 <div

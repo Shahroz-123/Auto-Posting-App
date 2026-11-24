@@ -17,10 +17,12 @@ import {
   CheckCircle2,
   Sparkles,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import BackButton from "@/components/BackButton";
 import { SocialPlatform } from "@/lib/data";
 import ConnectSocialModal from "@/components/ConnectSocialModal";
+import { useUserRole } from "@/components/UserRoleContext";
 
 interface CompanyRecord {
   id: number;
@@ -41,6 +43,7 @@ interface CompanyRecord {
 }
 
 export default function CompaniesPage() {
+  const { isAdmin } = useUserRole();
   const [companiesList, setCompaniesList] = useState<CompanyRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -123,6 +126,18 @@ export default function CompaniesPage() {
       console.error("Failed to save company to database:", err);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDeleteCompany = async (id: number, name: string) => {
+    if (!confirm(`Are you sure you want to permanently delete "${name}" from the database?`)) return;
+    try {
+      const res = await fetch(`/api/companies?id=${id}`, { method: "DELETE" });
+      if (res.ok) {
+        fetchCompanies();
+      }
+    } catch (err) {
+      console.error("Delete company error:", err);
     }
   };
 
@@ -363,6 +378,16 @@ export default function CompaniesPage() {
                 >
                   Planner
                 </Link>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteCompany(company.id, company.name)}
+                    title="Permanently Delete Company from Database"
+                    className="rounded-xl border border-red-200 p-2.5 text-red-600 hover:bg-red-50 transition"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
               </div>
             </div>
           ))}

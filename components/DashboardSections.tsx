@@ -9,6 +9,7 @@ import {
   Globe,
   BriefcaseBusiness,
   Video,
+  MessageCircle,
   Image,
   Film,
   Sparkles,
@@ -17,8 +18,10 @@ import {
   ArrowUpRight,
   Circle,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
+import { useUserRole } from "@/components/UserRoleContext";
 
 /* ----------------------------------
    TYPES
@@ -146,6 +149,7 @@ export default function DashboardSections({
   pipelineData,
   companiesList = [],
 }: DashboardSectionsProps) {
+  const { isAdmin } = useUserRole();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
@@ -357,6 +361,19 @@ export default function DashboardSections({
     }
   }
 
+  // Delete task from Neon DB
+  async function handleDeleteTask(taskId: number) {
+    if (!confirm("Are you sure you want to permanently delete this task from the database?")) return;
+    try {
+      const res = await fetch(`/api/tasks?id=${taskId}`, { method: "DELETE" });
+      if (res.ok) {
+        setTasks((prev) => prev.filter((t) => t.id !== taskId));
+      }
+    } catch (err) {
+      console.error("Failed to delete task from DB:", err);
+    }
+  }
+
   const selectedCompanyName =
     selectedCompany === "all"
       ? "All Companies"
@@ -400,16 +417,19 @@ export default function DashboardSections({
 
           <div className="mt-5 flex flex-wrap items-center gap-4 border-t border-gray-100 pt-4 text-xs text-gray-500">
             <span className="flex items-center gap-1.5">
-              <Camera size={14} /> Instagram
+              <Camera size={14} className="text-pink-600" /> Instagram
             </span>
             <span className="flex items-center gap-1.5">
-              <Globe size={14} /> Facebook
+              <MessageCircle size={14} className="text-green-600" /> WhatsApp
             </span>
             <span className="flex items-center gap-1.5">
-              <BriefcaseBusiness size={14} /> LinkedIn
+              <Globe size={14} className="text-blue-600" /> Facebook
             </span>
             <span className="flex items-center gap-1.5">
-              <Video size={14} /> TikTok
+              <BriefcaseBusiness size={14} className="text-blue-700" /> LinkedIn
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Video size={14} className="text-gray-900" /> TikTok
             </span>
           </div>
         </section>
@@ -487,16 +507,28 @@ export default function DashboardSections({
                       </td>
 
                       <td className="py-4">
-                        <button
-                          onClick={() => toggleTaskCompletion(task.id)}
-                          className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                            task.completed
-                              ? "bg-green-50 text-green-700 hover:bg-green-100"
-                              : "bg-blue-50 text-blue-700 hover:bg-blue-100"
-                          }`}
-                        >
-                          {task.completed ? "Completed" : "Mark complete"}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => toggleTaskCompletion(task.id)}
+                            className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                              task.completed
+                                ? "bg-green-50 text-green-700 hover:bg-green-100"
+                                : "bg-blue-50 text-blue-700 hover:bg-blue-100"
+                            }`}
+                          >
+                            {task.completed ? "Completed" : "Mark complete"}
+                          </button>
+
+                          {isAdmin && (
+                            <button
+                              onClick={() => handleDeleteTask(task.id)}
+                              title="Delete Task from Database"
+                              className="rounded-lg p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

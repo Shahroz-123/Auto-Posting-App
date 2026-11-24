@@ -42,6 +42,7 @@ export default function MediaLibraryPage() {
 
   // Upload Form State
   const [uploadName, setUploadName] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadType, setUploadType] = useState<"image" | "video" | "graphic">("image");
   const [uploadCompanyId, setUploadCompanyId] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -105,10 +106,35 @@ export default function MediaLibraryPage() {
 
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!uploadName.trim()) return;
+    if (!uploadName.trim() && !selectedFile) return;
 
     try {
       setSubmitting(true);
+      let fileUrl = `/uploads/${uploadName}`;
+
+      if (selectedFile) {
+        const formData = new FormData();
+        formData.append("file", selectedFile);
+        formData.append("companyId", uploadCompanyId);
+
+        const resUpload = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (resUpload.ok) {
+          const uploadData = await resUpload.json();
+          if (uploadData.mediaRecord) {
+            setMediaList([uploadData.mediaRecord, ...mediaList]);
+            setUploadName("");
+            setSelectedFile(null);
+            setIsUploadOpen(false);
+            return;
+          }
+          fileUrl = uploadData.url;
+        }
+      }
+
       const res = await fetch("/api/media", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -118,7 +144,7 @@ export default function MediaLibraryPage() {
             ? uploadName
             : `${uploadName}.${uploadType === "video" ? "mp4" : "png"}`,
           fileType: uploadType,
-          fileUrl: `/uploads/${uploadName}`,
+          fileUrl,
         }),
       });
 
@@ -126,6 +152,7 @@ export default function MediaLibraryPage() {
         const created = await res.json();
         setMediaList([created, ...mediaList]);
         setUploadName("");
+        setSelectedFile(null);
         setIsUploadOpen(false);
       }
     } catch (err) {
@@ -336,6 +363,26 @@ export default function MediaLibraryPage() {
             </div>
 
             <form onSubmit={handleUploadSubmit} className="mt-4 space-y-4">
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-gray-700">
+                  Select File (Image or Video)
+                </label>
+                <input
+                  type="file"
+                  accept="image/*,video/*"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) {
+                      setSelectedFile(f);
+                      if (!uploadName) setUploadName(f.name);
+                      if (f.type.startsWith("video/")) setUploadType("video");
+                      else setUploadType("image");
+                    }
+                  }}
+                  className="w-full rounded-xl border border-gray-200 p-2 text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-green-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-green-700 hover:file:bg-green-100"
+                />
+              </div>
+
               <div>
                 <label className="mb-1 block text-xs font-semibold text-gray-700">
                   Asset Title / File Name
