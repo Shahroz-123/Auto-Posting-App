@@ -534,14 +534,32 @@ export default function PostsPage() {
                 </p>
               )}
 
-              {/* Media Container Mockup */}
-              <div className="mt-4 flex h-48 items-center justify-center rounded-xl bg-linear-to-br from-green-50 to-gray-100 border border-gray-100 text-gray-400">
-                <div className="text-center">
-                  <Camera size={32} className="mx-auto text-green-600 mb-1" />
-                  <p className="text-xs font-medium text-gray-600">Post Media Content</p>
-                  <p className="text-[10px] text-gray-400">{previewPost.company?.name} Workspace</p>
+              {/* Media Container */}
+              {previewPost.mediaUrl ? (
+                <div className="mt-4 overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
+                  {previewPost.mediaUrl.match(/\.(mp4|mov|webm)(\?|$)/i) ? (
+                    <video
+                      src={previewPost.mediaUrl}
+                      controls
+                      className="max-h-64 w-full"
+                    />
+                  ) : (
+                    <img
+                      src={previewPost.mediaUrl}
+                      alt="Post media"
+                      className="max-h-64 w-full object-contain"
+                    />
+                  )}
                 </div>
-              </div>
+              ) : (
+                <div className="mt-4 flex h-48 items-center justify-center rounded-xl bg-linear-to-br from-green-50 to-gray-100 border border-gray-100 text-gray-400">
+                  <div className="text-center">
+                    <Camera size={32} className="mx-auto text-green-600 mb-1" />
+                    <p className="text-xs font-medium text-gray-600">No Media Attached</p>
+                    <p className="text-[10px] text-gray-400">{previewPost.company?.name} Workspace</p>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="mt-6 flex justify-end">

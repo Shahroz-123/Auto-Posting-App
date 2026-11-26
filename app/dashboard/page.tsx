@@ -229,7 +229,7 @@ export default function Dashboard() {
 
       {/* Company Cards */}
       <section>
-        <h2 className="mb-4 text-lg font-bold text-gray-900">Your Companies in DB</h2>
+        <h2 className="mb-4 text-lg font-bold text-gray-900">Your Companies</h2>
 
         {loading ? (
           <div className="flex h-36 items-center justify-center rounded-xl bg-white border border-gray-100">

@@ -253,6 +253,9 @@ model Media {
   fileName  String
   fileUrl   String
   fileType  String
+  mimeType  String?
+  fileSize  Int?
+  data      Bytes?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

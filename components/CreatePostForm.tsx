@@ -113,6 +113,17 @@ export default function CreatePostForm() {
   );
 
   const [media, setMedia] = useState<File | null>(null);
+  const [selectedLibraryMedia, setSelectedLibraryMedia] = useState<{
+    id: number;
+    fileName: string;
+    fileUrl: string;
+    fileType: string;
+  } | null>(null);
+  const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
+  const [libraryAssets, setLibraryAssets] = useState<
+    { id: number; fileName: string; fileUrl: string; fileType: string; companyId: number }[]
+  >([]);
+  const [loadingLibrary, setLoadingLibrary] = useState(false);
 
   const [previewUrl, setPreviewUrl] = useState("");
 
@@ -163,20 +174,38 @@ export default function CreatePostForm() {
 
     useEffect(() => {
 
-    if (!media) {
-      setPreviewUrl("");
+    if (media) {
+      const url = URL.createObjectURL(media);
+      setPreviewUrl(url);
+      return () => {
+        URL.revokeObjectURL(url);
+      };
+    }
+
+    if (selectedLibraryMedia) {
+      setPreviewUrl(selectedLibraryMedia.fileUrl);
       return;
     }
 
-    const url = URL.createObjectURL(media);
+    setPreviewUrl("");
 
-    setPreviewUrl(url);
+  }, [media, selectedLibraryMedia]);
 
-    return () => {
-      URL.revokeObjectURL(url);
-    };
-
-  }, [media]);
+  async function openLibraryModal() {
+    setIsLibraryModalOpen(true);
+    try {
+      setLoadingLibrary(true);
+      const res = await fetch("/api/media");
+      if (res.ok) {
+        const data = await res.json();
+        setLibraryAssets(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error("Failed to load media library:", err);
+    } finally {
+      setLoadingLibrary(false);
+    }
+  }
 
 
   function handleMediaUpload(
@@ -208,6 +237,7 @@ export default function CreatePostForm() {
     }
 
     setMessage("");
+    setSelectedLibraryMedia(null);
     setMedia(file);
 
   }
@@ -283,23 +313,21 @@ export default function CreatePostForm() {
     };
 
     try {
-      let finalMediaUrl = previewUrl || null;
+      let finalMediaUrl: string | null = selectedLibraryMedia?.fileUrl || null;
       if (media) {
         const formData = new FormData();
         formData.append("file", media);
         formData.append("companyId", companyId);
-        try {
-          const uploadRes = await fetch("/api/upload", {
-            method: "POST",
-            body: formData,
-          });
-          if (uploadRes.ok) {
-            const uploadJson = await uploadRes.json();
-            finalMediaUrl = uploadJson.url;
-          }
-        } catch (uploadErr) {
-          console.error("Media upload error:", uploadErr);
+        const uploadRes = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+        if (!uploadRes.ok) {
+          const uploadErr = await uploadRes.json().catch(() => ({}));
+          throw new Error(uploadErr.error || "Failed to upload media file.");
         }
+        const uploadJson = await uploadRes.json();
+        finalMediaUrl = uploadJson.url;
       }
 
       const res = await fetch("/api/posts", {
@@ -717,9 +745,20 @@ export default function CreatePostForm() {
 
           <section className="rounded-xl border bg-white p-5">
 
-            <h2 className="mb-4 font-semibold">
-              5. Upload Media
-            </h2>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="font-semibold">
+                5. Upload Media
+              </h2>
+
+              <button
+                type="button"
+                onClick={openLibraryModal}
+                className="flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-100 transition"
+              >
+                <ImagePlus size={14} />
+                <span>Choose from Media Library</span>
+              </button>
+            </div>
 
             <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 p-8 transition hover:border-green-600 hover:bg-green-50">
 
@@ -744,6 +783,38 @@ export default function CreatePostForm() {
               />
 
             </label>
+
+            {selectedLibraryMedia && !media && (
+
+              <div className="mt-4 flex items-center justify-between rounded-lg border border-green-200 bg-green-50/50 p-3">
+
+                <div className="flex items-center gap-3">
+
+                  <ImagePlus size={20} className="text-green-700" />
+
+                  <div>
+                    <p className="text-sm font-medium">
+                      {selectedLibraryMedia.fileName}
+                    </p>
+
+                    <p className="text-xs text-gray-500 uppercase">
+                      From Media Library · {selectedLibraryMedia.fileType}
+                    </p>
+                  </div>
+
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedLibraryMedia(null)}
+                  className="text-red-500"
+                >
+                  <X size={19} />
+                </button>
+
+              </div>
+
+            )}
 
             {media && (
 
@@ -853,20 +924,20 @@ export default function CreatePostForm() {
 
                 <div className="bg-gray-100">
 
-                  {media?.type.startsWith("image/") ? (
-
-                    <img
-                      src={previewUrl}
-                      alt="Post preview"
-                      className="max-h-80 w-full object-contain"
-                    />
-
-                  ) : (
+                  {media?.type.startsWith("video/") || selectedLibraryMedia?.fileType === "video" ? (
 
                     <video
                       src={previewUrl}
                       controls
                       className="max-h-80 w-full"
+                    />
+
+                  ) : (
+
+                    <img
+                      src={previewUrl}
+                      alt="Post preview"
+                      className="max-h-80 w-full object-contain"
                     />
 
                   )}
@@ -1158,6 +1229,65 @@ export default function CreatePostForm() {
             setMessage("✨ AI generated caption and hashtags applied successfully!");
           }}
         />
+      )}
+
+      {/* Media Library Picker Modal */}
+      {isLibraryModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <h3 className="font-bold text-gray-900">Select from Media & Asset Library</h3>
+              <button
+                type="button"
+                onClick={() => setIsLibraryModalOpen(false)}
+                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {loadingLibrary ? (
+              <div className="flex h-48 items-center justify-center">
+                <Loader2 size={28} className="animate-spin text-green-700" />
+              </div>
+            ) : libraryAssets.length === 0 ? (
+              <div className="py-12 text-center text-sm text-gray-500">
+                No assets in your Media Library yet. Upload an image in Media Library first.
+              </div>
+            ) : (
+              <div className="mt-4 grid max-h-96 grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3">
+                {libraryAssets.map((asset) => (
+                  <button
+                    type="button"
+                    key={asset.id}
+                    onClick={() => {
+                      setMedia(null);
+                      setSelectedLibraryMedia(asset);
+                      setIsLibraryModalOpen(false);
+                    }}
+                    className="group overflow-hidden rounded-xl border border-gray-200 text-left transition hover:border-green-600 hover:shadow-sm"
+                  >
+                    <div className="flex h-28 items-center justify-center bg-gray-100 overflow-hidden">
+                      {asset.fileType === "video" ? (
+                        <video src={asset.fileUrl} muted className="h-full w-full object-cover" />
+                      ) : (
+                        <img
+                          src={asset.fileUrl}
+                          alt={asset.fileName}
+                          className="h-full w-full object-cover group-hover:scale-105 transition"
+                        />
+                      )}
+                    </div>
+                    <div className="p-2">
+                      <p className="truncate text-xs font-semibold text-gray-800">{asset.fileName}</p>
+                      <p className="text-[10px] uppercase text-gray-400">{asset.fileType}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
     </div>
